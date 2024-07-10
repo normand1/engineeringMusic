@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engineering Music</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+        }
+        #randomizeButton, #toggleAudio {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #ff00ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        #toggleAudio {
+            display: none;
+        }
+        #getMusicButton {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #00ffff;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="randomizeButton">Randomize</button>
+        <button id="toggleAudio">Pause Audio</button>
+    </div>
+    <button id="getMusicButton">Get Music For Shape Rotators</button>
+    <audio id="backgroundMusic" loop>
+        <source src="https://cdn1.suno.ai/12add9d5-dfc6-47ec-b0b2-c4dc65f311af.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <script>
+        // Set up the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        let polyhedron, gridHelper, backPlane;
+
+        // Audio setup
+        const audio = document.getElementById('backgroundMusic');
+        const toggleAudioButton = document.getElementById('toggleAudio');
+        const getMusicButton = document.getElementById('getMusicButton');
+
+        audio.volume = 0.5; // Set initial volume to 50%
+
+        let isFirstInteraction = true;
+
+        toggleAudioButton.addEventListener('click', () => {
+            if (audio.paused) {
+                audio.play();
+                toggleAudioButton.textContent = 'Pause Audio';
+            } else {
+                audio.pause();
+                toggleAudioButton.textContent = 'Play Audio';
+            }
+        });
+
+        getMusicButton.addEventListener('click', () => {
+            window.open('https://suno.com/playlist/c8e64403-6584-422c-bf8c-2f510d74d15a', '_blank');
+        });
+
+        // Function to generate random pastel color
+        function getRandomPastelColor() {
+            const r = (Math.floor(Math.random() * 127) + 128).toString(16);
+            const g = (Math.floor(Math.random() * 127) + 128).toString(16);
+            const b = (Math.floor(Math.random() * 127) + 128).toString(16);
+            return `#${r}${g}${b}`;
+        }
+
+        // Create synthwave background
+        function createSynthwaveBackground() {
+            // Remove existing grid and backplane if they exist
+            if (gridHelper) scene.remove(gridHelper);
+            if (backPlane) scene.remove(backPlane);
+
+            const color1 = new THREE.Color(getRandomPastelColor());
+            const color2 = new THREE.Color(getRandomPastelColor());
+
+            // Create a grid for the floor
+            gridHelper = new THREE.GridHelper(200, 40, color1, color2);
+            scene.add(gridHelper);
+
+            // Create a backplane with gradient
+            const vertexShader = `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `;
+
+            const fragmentShader = `
+                uniform vec3 colorA;
+                uniform vec3 colorB;
+                varying vec2 vUv;
+                void main() {
+                    gl_FragColor = vec4(mix(colorA, colorB, vUv.y), 1.0);
+                }
+            `;
+
+            const uniforms = {
+                colorA: { type: 'vec3', value: new THREE.Color(0x000000) },
+                colorB: { type: 'vec3', value: color1 }
+            };
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader
+            });
+
+            backPlane = new THREE.Mesh(new THREE.PlaneGeometry(200, 100), material);
+            backPlane.position.y = 15;
+            backPlane.position.z = -50;
+            scene.add(backPlane);
+        }
+
+        function createRandomPolyhedron() {
+            if (polyhedron) {
+                scene.remove(polyhedron);
+            }
+
+            const geometries = [
+                new THREE.TetrahedronGeometry(1),
+                new THREE.OctahedronGeometry(1),
+                new THREE.DodecahedronGeometry(1),
+                new THREE.IcosahedronGeometry(1)
+            ];
+
+            const randomGeometry = geometries[Math.floor(Math.random() * geometries.length)];
+            
+            const material = new THREE.MeshPhongMaterial({
+                color: getRandomPastelColor(),
+                wireframe: false,
+                emissive: 0x333333,
+                shininess: 100
+            });
+
+            polyhedron = new THREE.Mesh(randomGeometry, material);
+            polyhedron.position.y = 3; // Raise the polyhedron above the grid
+            scene.add(polyhedron);
+        }
+
+        function randomizeScene() {
+            createSynthwaveBackground();
+            createRandomPolyhedron();
+        }
+
+        randomizeScene();
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 3, 0);
+
+        // Add rotation controls
+        let isDragging = false;
+        let previousMousePosition = {
+            x: 0,
+            y: 0
+        };
+
+        document.addEventListener('mousedown', (e) => {
+            isDragging = true;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaMove = {
+                    x: e.offsetX - previousMousePosition.x,
+                    y: e.offsetY - previousMousePosition.y
+                };
+
+                polyhedron.rotation.y += deltaMove.x * 0.01;
+                polyhedron.rotation.x += deltaMove.y * 0.01;
+
+                if (isFirstInteraction) {
+                    audio.play().catch(e => console.log("Audio play failed:", e));
+                    toggleAudioButton.style.display = 'inline-block';
+                    getMusicButton.style.display = 'block';
+                    isFirstInteraction = false;
+                }
+            }
+
+            previousMousePosition = {
+                x: e.offsetX,
+                y: e.offsetY
+            };
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            isDragging = false;
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Add event listener for the randomize button
+        document.getElementById('randomizeButton').addEventListener('click', randomizeScene);
+    </script>
+</body>
+</html>
